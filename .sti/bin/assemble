@@ -19,10 +19,10 @@ fi
 #   echo "---> Restoring build artifacts"
 #   mv /tmp/artifacts/. ./
 # fi
-# 
+#
 # echo "---> Installing application source"
 # cp -Rf /tmp/src/. ./
-# 
+#
 # echo "---> Building application from source"
 # # TODO: Add build steps for your application, eg npm install, bundle install
 
@@ -30,7 +30,8 @@ fi
 
 # Source code provided to STI is at ${HOME}/source
 HOME=/opt/app-root/src
-LOCAL_SOURCE_DIR=${HOME}/source
+GOROOT=/go
+LOCAL_SOURCE_DIR=${GOROOT}/src/app
 mkdir -p $LOCAL_SOURCE_DIR
 
 DEPLOY_DIR=/opt/openshift
@@ -39,36 +40,38 @@ DEPLOY_DIR=/opt/openshift
 ARTIFACT_DIR=${ARTIFACT_DIR-target}
 
 function copy_artifacts() {
-  if [ -d $LOCAL_SOURCE_DIR/$1 ]; then
-    echo "Copying all JAR artifacts from $LOCAL_SOURCE_DIR/$1 directory into $DEPLOY_DIR for later deployment..."
-    cp -v $LOCAL_SOURCE_DIR/$1/*.jar $DEPLOY_DIR 2> /dev/null
+	echo resulting directory is:
+	ls -al
+  if [ -x $LOCAL_SOURCE_DIR/app ]; then
+    echo "Copying 'app' artifact from $LOCAL_SOURCE_DIR/app directory into $DEPLOY_DIR for later deployment..."
+    cp -v $LOCAL_SOURCE_DIR/app $DEPLOY_DIR 2> /dev/null
   fi
 }
 
 # Copy the source for compilation
 cp -ad /tmp/src/* $LOCAL_SOURCE_DIR
 
-# If a pom.xml is present, this is a normal build scenario
-# so run maven.
-if [ -f "$LOCAL_SOURCE_DIR/pom.xml" ]; then
-  echo "Building with maven. $LOCAL_SOURCE_DIR/pom.xml found."
+# If a Makefile is present, this is a normal build scenario
+# so run make.
+if [ -f "$LOCAL_SOURCE_DIR/Makefile" ]; then
+  echo "Building with make. $LOCAL_SOURCE_DIR/Makefile found."
   pushd $LOCAL_SOURCE_DIR &> /dev/null
 
   if [ -z "$BUILDER_ARGS" ]; then
-    export BUILDER_ARGS="package -Popenshift -DskipTests -Dcom.redhat.xpaas.repo.redhatga -B"
+    export BUILDER_ARGS=""
   fi
 
-  echo "Found pom.xml... attempting to build with 'mvn -e ${BUILDER_ARGS}'"
+  echo "Found Makefile... attempting to build with make ${BUILDER_ARGS}"
 
-  echo "Maven version:"
-  mvn --version
+  echo "Make version:"
+  make -v
 
   # Execute the actual build
-  mvn -e $BUILDER_ARGS
+  make $BUILDER_ARGS
 
   ERR=$?
   if [ $ERR -ne 0 ]; then
-    echo "Aborting due to error code $ERR from Maven build"
+    echo "Aborting due to error code $ERR from build"
     exit $ERR
   fi
 
@@ -76,34 +79,32 @@ if [ -f "$LOCAL_SOURCE_DIR/pom.xml" ]; then
   # to the $DEPLOY_DIR directory for later deployment
   copy_artifacts target
 
-  # clean up after maven
-  mvn clean
-  if [ -d "$HOME/.m2/repository" ]; then
-    rm -r "$HOME/.m2/repository"
+  # clean up after make
+  make clean
+  if [ -d "$GOROOT/pkg" ]; then
+    rm -r "$GOROOT/pkg"
   fi
 
   popd &> /dev/null
-elif [ -f "$LOCAL_SOURCE_DIR/build.gradle" ]; then
-   echo "Building with gradle. $LOCAL_SOURCE_DIR/build.gradle found."
+else
+   echo "Building with go."
 
    pushd $LOCAL_SOURCE_DIR &> /dev/null
 
   if [ -z "$BUILDER_ARGS" ]; then
-    export BUILDER_ARGS="build -x test"
+    export BUILDER_ARGS=""
     # TODO: Specify setting file with -c sss
   fi
 
-  echo "Found gradle.build ... attempting to build with 'gradle -s ${BUILDER_ARGS}'"
-
-  echo "Gradle version:"
-  gradle --version
+  echo "Go version:"
+  go version
 
   # Execute the actual build
-  gradle -s $BUILDER_ARGS
+  go build $BUILDER_ARGS -o app
 
   ERR=$?
   if [ $ERR -ne 0 ]; then
-    echo "Aborting due to error code $ERR from Gradle build"
+    echo "Aborting due to error code $ERR from Go build"
     exit $ERR
   fi
 
@@ -112,8 +113,9 @@ elif [ -f "$LOCAL_SOURCE_DIR/build.gradle" ]; then
   copy_artifacts build/libs
 
 
-  # clean up after maven
-  gradle clean
+  # clean up after go build
+  rm -rf ${GOROOT}/pkg
+
 #  if [ -d "$HOME/.m2/repository" ]; then
 #    rm -r "$HOME/.m2/repository"
 #  fi
@@ -130,13 +132,12 @@ fi
 #   cp -v $LOCAL_SOURCE_DIR/configuration/* $ARTIFACTS_HOME
 # fi
 
-# As SpringBoot you should only have 1 fat jar
-if [ $(ls /opt/openshift/*.jar | wc -l) -eq 1 ]; then
-  mv /opt/openshift/*.jar /opt/openshift/app.jar
-  [ ! -f /opt/openshift/app.jar ] && echo "Application could not be properly built." && exit 1 
-  echo "Application jar file is located in /opt/openshift/app.jar"
+# As a Go app you should only have 1 artifact
+if [ $(ls /opt/openshift/* | wc -l) -eq 1 ]; then
+  [ ! -f /opt/openshift/app ] && echo "Application could not be properly built." && exit 1
+  echo "Application is located in /opt/openshift/app"
 else
-  echo "Whoa.  More than one jar file found!  This builder assumes you have a single (fat) jar."
-  echo "Found the following jars:  " `ls /opt/openshift/*.jar`
+  echo "Whoa.  More than one file found!  This builder assumes you have a single build artifact."
+  echo "Found the following files:  " `ls /opt/openshift/*`
   exit 1
 fi
