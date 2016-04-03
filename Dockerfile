@@ -6,7 +6,6 @@ ENV GO_VERSION 1.6
 
 ENV PATH=/opt/maven/bin/:/opt/gradle/bin/:$PATH
 
-
 ENV BUILDER_VERSION 1.0
 
 LABEL io.k8s.description="Platform for building golang applications" \
@@ -21,7 +20,14 @@ LABEL io.k8s.description="Platform for building golang applications" \
 LABEL io.openshift.s2i.scripts-url=image:///usr/local/sti
 COPY ./.sti/bin/ /usr/local/sti
 
-RUN chown -R 1001:1001 /opt/openshift
+RUN groupadd --gid 1001 golang && \
+    useradd --uid 1001 --gid 1001 --home /go golang && \
+    mkdir -p /opt/openshift && \
+    mkdir -p /opt/app-root/source && chmod -R a+rwX /opt/app-root/source && \
+    mkdir -p /opt/s2i/destination && chmod -R a+rwX /opt/s2i/destination && \
+    mkdir -p /opt/app-root/src && chmod -R a+rwX /opt/app-root/src && \
+    chown -R 1001:1001 /go && \
+    chown -R 1001:1001 /opt/openshift
 
 # This default user is created in the openshift/base-centos7 image
 USER 1001
