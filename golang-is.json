@@ -1,0 +1,29 @@
+{
+   "kind": "List",
+   "apiVersion": "v1",
+   "metadata": {
+      "name": "hystrix"
+   },
+     "items": [
+    {
+       "kind": "ImageStream",
+       "apiVersion": "v1",
+       "metadata": {
+          "name": "golang"
+       },
+       "spec": {
+          "dockerImageRepository": "library/golang"
+       }
+    },
+    {
+       "kind": "ImageStream",
+       "apiVersion": "v1",
+       "metadata": {
+          "name": "golang-sti"
+       },
+       "spec": {
+          "dockerImageRepository": ""
+       }
+    }
+  ]
+}
