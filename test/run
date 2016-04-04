@@ -99,7 +99,7 @@ wait_for_cid() {
 test_usage() {
   echo "Testing 'sti usage'..."
 #  s2i usage ${sti_args} ${IMAGE_NAME} &>/dev/null
-  s2i usage ${sti_args} ${IMAGE_NAME}
+  s2i usage ${IMAGE_NAME} &>/dev/null
 }
 
 test_connection() {
